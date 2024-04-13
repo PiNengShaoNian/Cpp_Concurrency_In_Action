@@ -34,6 +34,15 @@ class lock_free_stack {
       ;
   }
 
+  void increase_head_count(counted_node_ptr &old_counter) {
+    counted_node_ptr new_counter;
+    do {
+      new_counter = old_counter;
+      ++new_counter.external_count;
+    } while (!head.compare_exchange_strong(old_counter, new_counter));
+    old_counter.external_count = new_counter.external_count;
+  }
+
   std::shared_ptr<T> pop() {
     counted_node_ptr old_head = head.load();
     for (;;) {
