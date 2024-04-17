@@ -1,5 +1,4 @@
-// 代码清单8.3　采用std::packaged_task类的并行版std::accumulate()
-#include <functional>
+// 代码清单8.4　异常安全的并行版std::accumulate()
 #include <future>
 #include <numeric>
 #include <thread>
@@ -10,6 +9,19 @@ struct accumulate_block {
   T operator()(Iterator first, Iterator last) {
     return std::accumulate(first, last, T());
   };
+};
+
+class join_threads {
+  std::vector<std::thread> &threads;
+
+ public:
+  explicit join_threads(std::vector<std::thread> &threads_)
+      : threads(threads_) {}
+  ~join_threads() {
+    for (unsigned long i = 0; i < threads.size(); ++i) {
+      threads[i].join();
+    }
+  }
 };
 
 template <typename Iterator, typename T>
@@ -27,6 +39,7 @@ T parallel_accumulate(Iterator first, Iterator last, T init) {
   unsigned long const block_size = length / num_threads;
   std::vector<std::future<T>> futures(num_threads - 1);
   std::vector<std::thread> threads(num_threads - 1);
+  join_threads joiner(threads);
   Iterator block_start = first;
   for (unsigned long i = 0; i < (num_threads - 1); ++i) {
     Iterator block_end = block_start;
@@ -37,9 +50,8 @@ T parallel_accumulate(Iterator first, Iterator last, T init) {
     threads[i] = std::thread(std::move(task), block_start, block_end);
     block_start = block_end;
   }
+
   T last_result = accumulate_block<Iterator, T>()(block_start, last);
-  std::for_each(threads.begin(), threads.end(),
-                std::mem_fn(&std::thread::join));
   T result = init;
   for (unsigned long i = 0; i < (num_threads - 1); ++i) {
     result += futures[i].get();
