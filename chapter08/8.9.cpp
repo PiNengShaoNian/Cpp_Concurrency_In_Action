@@ -1,3 +1,4 @@
+// 代码清单8.9　std::find()算法函数的并行实现
 #include <atomic>
 #include <future>
 #include <thread>
@@ -55,4 +56,8 @@ Iterator parallel_find(Iterator first, Iterator last, MatchType match) {
     }
     find_element()(block_start, last, match, &result, &done_flag);
   }
+  if (!done_flag.load()) {
+    return last;
+  }
+  return result.get_future().get();
 }
